@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AI Threat Monitoring — SOC Dashboard</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --bg: #0b1120; --panel: #131c31; --panel-2: #182238; --border: #22304a;
+    --text: #e6ebf5; --muted: #93a1bd;
+    --low: #2e7d32; --medium: #e0a326; --high: #c0392b;
+    --accent: #3b82f6;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { padding: 18px 28px; border-bottom: 1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size: 18px; margin:0; font-weight:600; }
+  header .sub { color: var(--muted); font-size: 13px; margin-top:2px; }
+  .status { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); }
+  .dot { width:9px; height:9px; border-radius:50%; background:#555; }
+  .dot.on { background:#2ecc71; box-shadow:0 0 8px #2ecc71; }
+  main { padding: 20px 28px; display:grid; grid-template-columns: 1fr; gap: 18px; }
+  .cards { display:grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+  .card .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:0.04em; }
+  .card .value { font-size: 26px; font-weight:700; margin-top:6px; }
+  .card.low .value { color: var(--low); }
+  .card.medium .value { color: var(--medium); }
+  .card.high .value { color: var(--high); }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px 18px; }
+  .panel h2 { font-size: 14px; margin:0 0 12px 0; color: var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+  table { width:100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align:left; color:var(--muted); font-weight:600; padding: 8px 10px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--panel); }
+  td { padding: 8px 10px; border-bottom:1px solid var(--border-, #1c2740); vertical-align: top; }
+  tr:hover td { background: var(--panel-2); }
+  .badge { display:inline-block; padding: 2px 9px; border-radius: 999px; font-size:11px; font-weight:700; text-transform:uppercase; }
+  .badge.low { background: rgba(46,125,50,0.18); color:#4caf50; }
+  .badge.medium { background: rgba(224,163,38,0.18); color:#e0a326; }
+  .badge.high { background: rgba(192,57,43,0.18); color:#e74c3c; }
+  .score { font-variant-numeric: tabular-nums; font-weight:700; }
+  .rationale { color: var(--muted); max-width: 420px; }
+  .entity { font-family: ui-monospace, Menlo, monospace; }
+  .table-wrap { max-height: 420px; overflow-y: auto; }
+  canvas { max-height: 220px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+function Dashboard() {
+  const [connected, setConnected] = useState(false);
+  const [events, setEvents] = useState([]);
+  const [counts, setCounts] = useState({ low: 0, medium: 0, high: 0 });
+  const [total, setTotal] = useState(0);
+  const chartRef = useRef(null);
+  const chartInstance = useRef(null);
+  const scoreHistory = useRef([]);
+
+  useEffect(() => {
+    const ctx = chartRef.current.getContext("2d");
+    chartInstance.current = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [{
+          label: "Risk score",
+          data: [],
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59,130,246,0.15)",
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 2,
+          fill: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          y: { min: 0, max: 100, grid: { color: "#22304a" }, ticks: { color: "#93a1bd" } },
+          x: { display: false },
+        },
+        plugins: { legend: { display: false } },
+      },
+    });
+  }, []);
+
+  useEffect(() => {
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${proto}://${window.location.host}/ws/stream`);
+
+    ws.onopen = () => setConnected(true);
+    ws.onclose = () => setConnected(false);
+    ws.onerror = () => setConnected(false);
+
+    ws.onmessage = (msg) => {
+      const record = JSON.parse(msg.data);
+
+      setEvents((prev) => [record, ...prev].slice(0, 60));
+      setTotal((prev) => prev + 1);
+      setCounts((prev) => ({ ...prev, [record.tier]: prev[record.tier] + 1 }));
+
+      scoreHistory.current.push(record.risk_score);
+      if (scoreHistory.current.length > 80) scoreHistory.current.shift();
+      const chart = chartInstance.current;
+      if (chart) {
+        chart.data.labels = scoreHistory.current.map((_, i) => i);
+        chart.data.datasets[0].data = scoreHistory.current;
+        chart.update("none");
+      }
+    };
+
+    return () => ws.close();
+  }, []);
+
+  return (
+    <React.Fragment>
+      <header>
+        <div>
+          <h1>AI Threat Monitoring — SOC Dashboard</h1>
+          <div className="sub">Ensemble anomaly detection · explainable risk scoring · live analyst feed</div>
+        </div>
+        <div className="status">
+          <span className={"dot " + (connected ? "on" : "")}></span>
+          {connected ? "Live" : "Disconnected"}
+        </div>
+      </header>
+
+      <main>
+        <div className="cards">
+          <div className="card">
+            <div className="label">Events processed</div>
+            <div className="value">{total.toLocaleString()}</div>
+          </div>
+          <div className="card low">
+            <div className="label">Low risk</div>
+            <div className="value">{counts.low}</div>
+          </div>
+          <div className="card medium">
+            <div className="label">Medium risk</div>
+            <div className="value">{counts.medium}</div>
+          </div>
+          <div className="card high">
+            <div className="label">High risk</div>
+            <div className="value">{counts.high}</div>
+          </div>
+        </div>
+
+        <div className="panel">
+          <h2>Risk score — live stream</h2>
+          <canvas ref={chartRef}></canvas>
+        </div>
+
+        <div className="panel">
+          <h2>Analyst alert queue (most recent first)</h2>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Entity</th>
+                  <th>Risk</th>
+                  <th>Tier</th>
+                  <th>Action</th>
+                  <th>Latency</th>
+                  <th>Why (SHAP)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((e, i) => (
+                  <tr key={i}>
+                    <td className="entity">{e.entity_id}</td>
+                    <td className="score">{e.risk_score.toFixed(1)}</td>
+                    <td><span className={"badge " + e.tier}>{e.tier}</span></td>
+                    <td>{e.action.replaceAll("_", " ")}</td>
+                    <td>{e.latency_ms} ms</td>
+                    <td className="rationale">{e.rationale}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </React.Fragment>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<Dashboard />);
+</script>
+</body>
+</html>
