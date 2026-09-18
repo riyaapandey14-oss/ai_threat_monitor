@@ -47,7 +47,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5173",`r`n        "https://frontend-react-one-nu.vercel.app",
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
@@ -99,3 +99,4 @@ FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
 @app.get("/legacy")
 def legacy_dashboard():
     return FileResponse(os.path.join(FRONTEND_DIR, "legacy_dashboard.html"))
+
