@@ -1,9 +1,9 @@
 import axios from "axios";
 
-// Vite dev-server proxies /api -> http://127.0.0.1:8000/api (see vite.config.js),
-// so a relative base URL works both in dev and if later served behind the
-// same origin as the backend.
-const api = axios.create({ baseURL: "/api", timeout: 15000 });
+const api = axios.create({
+  baseURL: "https://backend-h5ht222gj-riyaapandey14-4107s-projects.vercel.app/api",
+  timeout: 15000,
+});
 
 export const getHealth = () => api.get("/health").then((r) => r.data);
 export const getAlerts = (params = {}) => api.get("/alerts", { params }).then((r) => r.data);
