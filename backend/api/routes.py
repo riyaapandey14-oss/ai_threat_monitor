@@ -6,7 +6,7 @@ REST API routes. Every handler calls into backend/services/detection_service.py
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from services.detection_service import service
+from backend.services.detection_service import service
 
 router = APIRouter(prefix="/api")
 
@@ -55,8 +55,8 @@ def get_explainability(alert_id: int):
         "feature_impacts": record["feature_impacts"],
         "rationale": record["rationale"],
         "model_confidence": record["classifier_score"],
-        "note": "Feature impacts are real SHAP TreeExplainer values from the "
-                "existing classifier, not simulated.",
+        "note": "Feature impacts are lightweight model-based explanations derived from the Gradient Boosting classifier's feature importances. "
+                "",
     }
 
 
@@ -107,5 +107,9 @@ def confirm_response(alert_id: int):
                 "credential revocation, or other destructive action is performed.",
         "alert": record,
     }
+
+
+
+
 
 

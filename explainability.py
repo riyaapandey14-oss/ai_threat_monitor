@@ -1,33 +1,36 @@
 """
-Explainability layer (Section 6.5 of the project documentation).
+Lightweight explainability layer.
 
-Uses SHAP (TreeExplainer, exact and fast for gradient-boosted trees) to
-attribute the classifier's decision to specific features, so every flagged
-event ships with a human-readable rationale instead of a bare score.
+Uses the GradientBoostingClassifier's built-in feature_importances_
+instead of SHAP, keeping the Explainable AI functionality while avoiding
+SHAP/Numba/llvmlite/SciPy deployment dependencies.
 """
 
 import numpy as np
-import shap
 
 from data.synthetic_data import FEATURE_NAMES
 
 
 class Explainer:
     def __init__(self, classifier_model):
-        self.explainer = shap.TreeExplainer(classifier_model)
+        self.model = classifier_model
 
     def explain(self, scaled_feature_vector, top_k=3):
         """
-        scaled_feature_vector: 1D np.ndarray, already scaled (same space the
-        classifier was trained on).
-        Returns a list of (feature_name, contribution) sorted by |contribution|.
+        Returns lightweight feature impacts based on the trained
+        GradientBoostingClassifier feature importances.
+
+        The signed impact is estimated from whether each feature's
+        standardized value is above or below zero.
         """
-        sv = self.explainer.shap_values(scaled_feature_vector.reshape(1, -1))
-        # sklearn GradientBoostingClassifier -> binary output, shap returns
-        # a single array of shape (1, n_features) for the positive class.
-        values = np.array(sv).reshape(-1)
-        pairs = list(zip(FEATURE_NAMES, values))
+        importances = np.asarray(self.model.feature_importances_)
+        values = np.asarray(scaled_feature_vector).reshape(-1)
+
+        impacts = importances * np.sign(values)
+
+        pairs = list(zip(FEATURE_NAMES, impacts))
         pairs.sort(key=lambda p: abs(p[1]), reverse=True)
+
         return pairs[:top_k]
 
     @staticmethod

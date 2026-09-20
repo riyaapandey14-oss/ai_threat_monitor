@@ -37,8 +37,8 @@ from fastapi.staticfiles import StaticFiles
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
-from api.routes import router as api_router          # noqa: E402
-from services.detection_service import service        # noqa: E402
+from backend.api.routes import router as api_router          # noqa: E402
+from backend.services.detection_service import service        # noqa: E402
 
 app = FastAPI(title="AI Threat Monitoring API")
 
@@ -48,6 +48,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
         "https://frontend-react-one-nu.vercel.app",
     ],
     allow_credentials=False,
@@ -100,6 +102,10 @@ FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
 @app.get("/legacy")
 def legacy_dashboard():
     return FileResponse(os.path.join(FRONTEND_DIR, "legacy_dashboard.html"))
+
+
+
+
 
 
 

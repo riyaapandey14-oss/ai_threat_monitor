@@ -4,5 +4,3 @@ websockets>=12.0
 numpy
 pandas
 scikit-learn
-shap
-matplotlib
