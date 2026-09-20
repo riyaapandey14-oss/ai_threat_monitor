@@ -6,8 +6,10 @@ REST API routes. Every handler calls into backend/services/detection_service.py
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from backend.services.detection_service import service
-
+try:
+    from backend.services.detection_service import service
+except ModuleNotFoundError:
+    from services.detection_service import service
 router = APIRouter(prefix="/api")
 
 
@@ -107,6 +109,7 @@ def confirm_response(alert_id: int):
                 "credential revocation, or other destructive action is performed.",
         "alert": record,
     }
+
 
 
 
